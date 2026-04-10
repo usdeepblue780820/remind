@@ -8,8 +8,14 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body { background-color: #f8fafc; }
-        .form-card { background: white; border-radius: 1.25rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-        input[type="datetime-local"] { min-height: 3rem; }
+        .form-card { 
+            background: white; 
+            border-radius: 1.25rem; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); 
+        }
+        input[type="datetime-local"] {
+            min-height: 3rem;
+        }
     </style>
 </head>
 <body class="p-4 flex items-center justify-center min-h-screen">
@@ -44,18 +50,21 @@
 
     <script>
         const MY_LIFF_ID = '2009768155-juHmylqj';
-        // ←←← 重要：請改成你 Google Apps Script 部署後的 Web App URL（結尾必須是 /exec）
-        const WEB_APP_URL = 'https://script.google.com/macros/s/你的WebAppID/exec';  
+        
+        // ←←←【重要】請把下面這行改成你實際部署的 Web App URL（結尾必須是 /exec）
+        const WEB_APP_URL = 'https://script.google.com/macros/s/你的實際WebAppID/exec';
 
         async function initLiff() {
             try {
                 await liff.init({ liffId: MY_LIFF_ID });
+                
                 if (!liff.isLoggedIn()) {
                     liff.login();
                     return;
                 }
             } catch (err) {
                 console.error('LIFF 初始化失敗', err);
+                showStatus('LIFF 初始化失敗，請重新整理頁面', 'text-red-500');
             }
         }
 
@@ -66,9 +75,7 @@
             const status = document.getElementById('statusMsg');
 
             if (!task || !datetime) {
-                status.innerHTML = '請填寫提醒事項和時間';
-                status.className = 'mt-6 text-center text-sm font-medium text-red-500';
-                status.classList.remove('hidden');
+                showStatus('請填寫提醒事項和時間', 'text-red-500');
                 return;
             }
 
@@ -79,10 +86,12 @@
             const formattedDate = datetime.replace('T', ' ');
 
             try {
-                // 直接呼叫後端寫入試算表
+                // 呼叫後端（使用 text/plain 避開 CORS 問題）
                 const response = await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'text/plain' 
+                    },
                     body: JSON.stringify({
                         action: 'addReminder',
                         task: task,
@@ -91,11 +100,9 @@
                 });
 
                 if (response.ok) {
-                    status.innerHTML = '✅ 提醒已成功儲存！<br>將在 1 天前與 1 小時前提醒您';
-                    status.className = 'mt-6 text-center text-sm font-medium text-green-600';
-                    status.classList.remove('hidden');
+                    showStatus('✅ 提醒已成功儲存！<br>將在 1 天前與 1 小時前自動提醒您', 'text-green-600');
 
-                    // 可選：同時在聊天室顯示確認
+                    // 同時在聊天室顯示確認訊息
                     await liff.sendMessages([{
                         type: 'text',
                         text: `✅ 已設定提醒\n事項：${task}\n時間：${formattedDate}`
@@ -108,16 +115,22 @@
                     throw new Error('後端儲存失敗');
                 }
             } catch (err) {
-                console.error(err);
-                status.innerHTML = '儲存失敗，請稍後再試';
-                status.className = 'mt-6 text-center text-sm font-medium text-red-500';
-                status.classList.remove('hidden');
+                console.error('儲存錯誤:', err);
+                showStatus('儲存失敗，請檢查網路或 Web App URL 是否正確', 'text-red-500');
             } finally {
                 btn.disabled = false;
                 btn.innerText = '儲存提醒';
             }
         }
 
+        function showStatus(msg, colorClass) {
+            const status = document.getElementById('statusMsg');
+            status.innerHTML = msg;
+            status.className = `mt-6 text-center text-sm font-medium ${colorClass}`;
+            status.classList.remove('hidden');
+        }
+
+        // 頁面載入時執行 LIFF 初始化
         window.onload = initLiff;
     </script>
 </body>
