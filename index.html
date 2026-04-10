@@ -8,16 +8,8 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body { background-color: #f8fafc; }
-        .form-card { 
-            background: white; 
-            border-radius: 1.25rem; 
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); 
-        }
-        input[type="datetime-local"] {
-            appearance: none;
-            -webkit-appearance: none;
-            min-height: 3rem;
-        }
+        .form-card { background: white; border-radius: 1.25rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        input[type="datetime-local"] { min-height: 3rem; }
     </style>
 </head>
 <body class="p-4 flex items-center justify-center min-h-screen">
@@ -51,35 +43,19 @@
     </div>
 
     <script>
-        const MY_LIFF_ID = '2009768155-juHmylqj';   // 你的真實 LIFF ID
+        const MY_LIFF_ID = '2009768155-juHmylqj';
+        // ←←← 重要：請改成你 Google Apps Script 部署後的 Web App URL（結尾必須是 /exec）
+        const WEB_APP_URL = 'https://script.google.com/macros/s/你的WebAppID/exec';  
 
         async function initLiff() {
-            const status = document.getElementById('statusMsg');
-            
             try {
-                showStatus('🔄 LIFF 初始化中...', 'text-gray-500');
-                
                 await liff.init({ liffId: MY_LIFF_ID });
-                console.log('✅ LIFF 初始化成功');
-
                 if (!liff.isLoggedIn()) {
-                    showStatus('🔑 跳轉 LINE 登入中...', 'text-blue-500');
                     liff.login();
                     return;
                 }
-
-                // 已登入，取得用戶資料
-                const profile = await liff.getProfile();
-                showStatus(`✅ 已登入！<br>歡迎 ${profile.displayName}`, 'text-green-600');
-                console.log('用戶 ID:', profile.userId);
-
             } catch (err) {
-                console.error('LIFF 初始化錯誤:', err);
-                let msg = '初始化失敗：' + (err.message || err);
-                if (err.message && err.message.includes('channel')) {
-                    msg = 'LIFF ID 或 Endpoint URL 設定有誤，請確認 LINE Developers';
-                }
-                showStatus(msg, 'text-red-500');
+                console.error('LIFF 初始化失敗', err);
             }
         }
 
@@ -87,45 +63,61 @@
             const task = document.getElementById('task').value.trim();
             const datetime = document.getElementById('datetime').value;
             const btn = document.getElementById('submitBtn');
+            const status = document.getElementById('statusMsg');
 
             if (!task || !datetime) {
-                showStatus('請填寫提醒事項和時間', 'text-red-500');
+                status.innerHTML = '請填寫提醒事項和時間';
+                status.className = 'mt-6 text-center text-sm font-medium text-red-500';
+                status.classList.remove('hidden');
                 return;
             }
 
             btn.disabled = true;
             btn.innerText = '儲存中...';
+            status.classList.add('hidden');
 
             const formattedDate = datetime.replace('T', ' ');
 
             try {
-                await liff.sendMessages([{
-                    type: 'text',
-                    text: `[紀錄] ${task} ${formattedDate}`
-                }]);
+                // 直接呼叫後端寫入試算表
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'addReminder',
+                        task: task,
+                        datetime: formattedDate
+                    })
+                });
 
-                showStatus('✅ 提醒已成功設定！<br>已傳送到聊天室', 'text-green-600');
-                
-                setTimeout(() => {
-                    liff.closeWindow();
-                }, 1800);
+                if (response.ok) {
+                    status.innerHTML = '✅ 提醒已成功儲存！<br>將在 1 天前與 1 小時前提醒您';
+                    status.className = 'mt-6 text-center text-sm font-medium text-green-600';
+                    status.classList.remove('hidden');
 
+                    // 可選：同時在聊天室顯示確認
+                    await liff.sendMessages([{
+                        type: 'text',
+                        text: `✅ 已設定提醒\n事項：${task}\n時間：${formattedDate}`
+                    }]);
+
+                    // 清空表單
+                    document.getElementById('task').value = '';
+                    document.getElementById('datetime').value = '';
+                } else {
+                    throw new Error('後端儲存失敗');
+                }
             } catch (err) {
-                console.error('傳送錯誤:', err);
-                showStatus('傳送失敗：' + (err.message || '請稍後再試'), 'text-red-500');
+                console.error(err);
+                status.innerHTML = '儲存失敗，請稍後再試';
+                status.className = 'mt-6 text-center text-sm font-medium text-red-500';
+                status.classList.remove('hidden');
+            } finally {
                 btn.disabled = false;
                 btn.innerText = '儲存提醒';
             }
         }
 
-        function showStatus(msg, colorClass) {
-            const status = document.getElementById('statusMsg');
-            status.innerHTML = msg;
-            status.className = `mt-6 text-center text-sm font-medium ${colorClass}`;
-            status.classList.remove('hidden');
-        }
-
-        // 頁面載入後執行
         window.onload = initLiff;
     </script>
 </body>
