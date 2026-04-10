@@ -8,35 +8,27 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body { background-color: #f8fafc; }
-        .form-card { 
-            background: white; 
-            border-radius: 1.25rem; 
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); 
-        }
-        input[type="datetime-local"] {
-            min-height: 3rem;
-        }
+        .form-card { background: white; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body class="p-4 flex items-center justify-center min-h-screen">
 
     <div class="form-card w-full max-w-md p-8">
         <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">提醒事項小幫手</h1>
+            <h1 class="text-2xl font-bold text-slate-800">提醒事項小幫手</h1>
         </div>
         
         <div class="space-y-6">
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">提醒事項</label>
-                <input type="text" id="task" placeholder="例如：與xxx吃飯、看醫生" 
-                    class="block w-full border border-gray-300 rounded-xl shadow-sm p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all">
+                <label class="block text-sm font-bold text-slate-600 mb-2">提醒事項</label>
+                <input type="text" id="task" placeholder="輸入要提醒的事項..." 
+                    class="block w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-all">
             </div>
 
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">選擇日期與時間</label>
+                <label class="block text-sm font-bold text-slate-600 mb-2">日期與時間</label>
                 <input type="datetime-local" id="datetime" 
-                    class="block w-full border border-gray-300 rounded-xl shadow-sm p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all text-gray-700">
-                <p class="text-xs text-gray-400 mt-2">點擊上方框欄開啟月曆</p>
+                    class="block w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none text-slate-700">
             </div>
 
             <button onclick="submitForm()" id="submitBtn"
@@ -49,22 +41,17 @@
     </div>
 
     <script>
-        const MY_LIFF_ID = '2009768155-juHmylqj';
-        
-        // ←←←【重要】請把下面這行改成你實際部署的 Web App URL（結尾必須是 /exec）
-        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzm8yPJm05NM9HCXrwr-c9kp1fA_-OQcoGQSA58HJxMABuxqvp_T1B01gCiIrUe88pw/exec';
+        // 請確保這是您在 LINE Developer 看到的正確 LIFF ID
+        const LIFF_ID = '2009768155-juHmylqj'; 
 
         async function initLiff() {
             try {
-                await liff.init({ liffId: MY_LIFF_ID });
-                
+                await liff.init({ liffId: LIFF_ID });
                 if (!liff.isLoggedIn()) {
                     liff.login();
-                    return;
                 }
             } catch (err) {
                 console.error('LIFF 初始化失敗', err);
-                showStatus('LIFF 初始化失敗，請重新整理頁面', 'text-red-500');
             }
         }
 
@@ -72,52 +59,38 @@
             const task = document.getElementById('task').value.trim();
             const datetime = document.getElementById('datetime').value;
             const btn = document.getElementById('submitBtn');
-            const status = document.getElementById('statusMsg');
 
             if (!task || !datetime) {
-                showStatus('請填寫提醒事項和時間', 'text-red-500');
+                alert('請完整填寫事項內容與時間');
                 return;
             }
 
             btn.disabled = true;
-            btn.innerText = '儲存中...';
-            status.classList.add('hidden');
-
-            const formattedDate = datetime.replace('T', ' ');
+            btn.innerText = '處理中...';
 
             try {
-                // 呼叫後端（使用 text/plain 避開 CORS 問題）
-                const response = await fetch(WEB_APP_URL, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'text/plain' 
-                    },
-                    body: JSON.stringify({
-                        action: 'addReminder',
-                        task: task,
-                        datetime: formattedDate
-                    })
-                });
-
-                if (response.ok) {
-                    showStatus('✅ 提醒已成功儲存！<br>將在 1 天前與 1 小時前自動提醒您', 'text-green-600');
-
-                    // 同時在聊天室顯示確認訊息
-                    await liff.sendMessages([{
-                        type: 'text',
-                        text: `✅ 已設定提醒\n事項：${task}\n時間：${formattedDate}`
-                    }]);
-
-                    // 清空表單
-                    document.getElementById('task').value = '';
-                    document.getElementById('datetime').value = '';
-                } else {
-                    throw new Error('後端儲存失敗');
+                if (!liff.isInClient()) {
+                    throw new Error('請從 LINE 聊天視窗內開啟小幫手');
                 }
+
+                // 格式化日期：將 T 換成空格
+                const formattedDate = datetime.replace('T', ' ');
+
+                // 直接發送訊息到聊天室
+                await liff.sendMessages([{
+                    type: 'text',
+                    text: `[紀錄] ${task} ${formattedDate}`
+                }]);
+
+                showStatus('✅ 儲存成功！視窗即將關閉', 'text-green-600');
+                
+                // 成功後延遲關閉視窗
+                setTimeout(() => {
+                    liff.closeWindow();
+                }, 1200);
+
             } catch (err) {
-                console.error('儲存錯誤:', err);
-                showStatus('儲存失敗，請檢查網路或 Web App URL 是否正確', 'text-red-500');
-            } finally {
+                alert('儲存失敗：' + err.message);
                 btn.disabled = false;
                 btn.innerText = '儲存提醒';
             }
@@ -130,7 +103,6 @@
             status.classList.remove('hidden');
         }
 
-        // 頁面載入時執行 LIFF 初始化
         window.onload = initLiff;
     </script>
 </body>
