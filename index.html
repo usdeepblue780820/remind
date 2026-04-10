@@ -1,125 +1,92 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>提醒事項小幫手</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <style>
-        body { background-color: #f8fafc; }
-        .form-card { background: white; border-radius: 1.25rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-        input[type="datetime-local"] {
-            appearance: none;
-            -webkit-appearance: none;
-            min-height: 3rem;
-        }
-    </style>
-</head>
-<body class="p-4 flex items-center justify-center min-h-screen">
+<script>
+    const MY_LIFF_ID = '2009768155-juHmylqj';   // ← 你的真實 LIFF ID
 
-    <div class="form-card w-full max-w-md p-8">
-        <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">提醒事項小幫手</h1>
-        </div>
+    async function initLiff() {
+        const status = document.getElementById('statusMsg');
         
-        <div class="space-y-6">
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">提醒事項</label>
-                <input type="text" id="task" placeholder="例如：與xxx吃飯、看醫生" 
-                    class="block w-full border border-gray-300 rounded-xl shadow-sm p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all">
-            </div>
+        if (MY_LIFF_ID === 'YOUR_LIFF_ID_HERE') {
+            showStatus('錯誤：請設定正確的 LIFF ID', 'text-red-500');
+            return;
+        }
 
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">選擇日期與時間</label>
-                <input type="datetime-local" id="datetime" 
-                    class="block w-full border border-gray-300 rounded-xl shadow-sm p-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-all text-gray-700">
-                <p class="text-xs text-gray-400 mt-2">點擊上方框欄開啟月曆</p>
-            </div>
+        try {
+            showStatus('🔄 LIFF 初始化中...', 'text-gray-500');
+            
+            await liff.init({ liffId: MY_LIFF_ID });
+            console.log('✅ LIFF 初始化成功');
 
-            <button onclick="submitForm()" id="submitBtn"
-                class="w-full bg-green-600 text-white font-bold py-4 rounded-xl hover:bg-green-700 active:scale-95 transition-all shadow-lg shadow-green-200">
-                儲存提醒
-            </button>
-        </div>
-
-        <div id="statusMsg" class="mt-6 text-center text-sm font-medium hidden"></div>
-    </div>
-
-    <script>
-        /**
-         * 重要提示：
-         * 請務必將下方的 'YOUR_LIFF_ID_HERE' 替換為 LINE Developers 控制台
-         * 建立的 LIFF App ID
-         */
-        const MY_LIFF_ID = '2009768155-juHmylqj'; 
-
-        async function initLiff() {
-            if (MY_LIFF_ID === 'YOUR_LIFF_ID_HERE') {
-                showStatus('錯誤：尚未設定 LIFF ID。', 'text-red-500');
+            if (!liff.isLoggedIn()) {
+                showStatus('🔑 跳轉 LINE 登入...', 'text-blue-500');
+                liff.login();
                 return;
             }
 
-            try {
-                await liff.init({ liffId: MY_LIFF_ID });
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                }
-            } catch (err) {
-                let errorMsg = '初始化失敗：' + err.message;
-                if (err.message.includes('channel not found')) {
-                    errorMsg = '錯誤：找不到頻道。請確認 LIFF ID 與網址是否相符。';
-                }
-                showStatus(errorMsg, 'text-red-500');
+            // 已登入，顯示歡迎訊息
+            const profile = await liff.getProfile();
+            showStatus(`✅ 已登入！<br>歡迎 ${profile.displayName}`, 'text-green-600');
+            console.log('用戶 ID:', profile.userId);
+
+        } catch (err) {
+            console.error('LIFF 初始化錯誤:', err);
+            let msg = '初始化失敗：' + (err.message || err);
+            if (err.message.includes('channel') || err.message.includes('not found')) {
+                msg = 'LIFF ID 或 Endpoint URL 設定錯誤，請到 LINE Developers 確認';
             }
+            showStatus(msg, 'text-red-500');
+        }
+    }
+
+    async function submitForm() {
+        const task = document.getElementById('task').value.trim();
+        const datetime = document.getElementById('datetime').value;
+        const btn = document.getElementById('submitBtn');
+
+        if (!task || !datetime) {
+            showStatus('請填寫提醒事項和時間', 'text-red-500');
+            return;
         }
 
-        async function submitForm() {
-            const task = document.getElementById('task').value;
-            const datetime = document.getElementById('datetime').value;
-            const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerText = '儲存中...';
 
-            if (!task || !datetime) {
-                showStatus('請填寫完整資訊', 'text-red-500');
+        const formattedDate = datetime.replace('T', ' ');
+
+        try {
+            // 安全檢查：確認 sendMessages 是否可用
+            if (!liff.isLoggedIn()) {
+                showStatus('請先登入 LINE', 'text-red-500');
                 return;
             }
 
-            if (!liff.isApiAvailable('sendMessages')) {
-                showStatus('LIFF 尚未就緒，請重新整理', 'text-red-500');
-                return;
-            }
+            await liff.sendMessages([{
+                type: 'text',
+                text: `[紀錄] ${task} ${formattedDate}`
+            }]);
 
-            btn.disabled = true;
-            btn.classList.add('opacity-50');
-            btn.innerText = '儲存中...';
+            showStatus('✅ 提醒已成功設定！\n已傳送至聊天室', 'text-green-600');
+            
+            // 1.5 秒後自動關閉 LIFF 視窗
+            setTimeout(() => {
+                liff.closeWindow();
+            }, 1500);
 
-            const formattedDate = datetime.replace('T', ' ');
-
-            try {
-                await liff.sendMessages([
-                    {
-                        type: 'text',
-                        text: `[紀錄] ${task} ${formattedDate}`
-                    }
-                ]);
-                showStatus('設定成功！即將關閉', 'text-green-600');
-                setTimeout(() => liff.closeWindow(), 1500);
-            } catch (err) {
-                showStatus('傳送失敗：' + err.message, 'text-red-500');
-                btn.disabled = false;
-                btn.classList.remove('opacity-50');
-                btn.innerText = '儲存提醒';
-            }
+        } catch (err) {
+            console.error('傳送錯誤:', err);
+            showStatus('傳送失敗：' + (err.message || '請稍後再試'), 'text-red-500');
+            
+            // 恢復按鈕
+            btn.disabled = false;
+            btn.innerText = '儲存提醒';
         }
+    }
 
-        function showStatus(msg, colorClass) {
-            const status = document.getElementById('statusMsg');
-            status.innerText = msg;
-            status.className = `mt-6 text-center text-sm font-medium ${colorClass}`;
-            status.classList.remove('hidden');
-        }
+    function showStatus(msg, colorClass) {
+        const status = document.getElementById('statusMsg');
+        status.innerHTML = msg;                    // 改用 innerHTML 支援換行
+        status.className = `mt-6 text-center text-sm font-medium ${colorClass}`;
+        status.classList.remove('hidden');
+    }
 
-        window.onload = initLiff;
-    </script>
-</body>
-</html>
+    // 頁面載入後執行初始化
+    window.onload = initLiff;
+</script>
