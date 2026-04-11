@@ -15,30 +15,28 @@
 <body class="p-4 flex flex-col items-center min-h-screen">
 
     <div class="w-full max-w-md">
-        <!-- 頁籤導覽 -->
         <div class="flex justify-around mb-6 bg-white rounded-xl p-2 shadow-sm">
             <button onclick="switchTab('add')" id="tabAdd" class="flex-1 py-2 text-center tab-active transition-all">新增提醒</button>
             <button onclick="switchTab('list')" id="tabList" class="flex-1 py-2 text-center text-gray-400 transition-all">查看行事曆</button>
         </div>
 
-        <!-- 新增提醒頁面 -->
         <div id="pageAdd" class="form-card p-8">
             <div class="text-center mb-8">
                 <h1 class="text-2xl font-bold text-gray-800">新增提醒事項</h1>
-                <p class="text-sm text-gray-400 mt-1">系統會於 1 天前與 1 小時前發送提醒。</p>
+                <p class="text-sm text-gray-400 mt-1">系統會於一天前以及一小時前發送提醒</p>
             </div>
             
             <div class="space-y-6">
                 <div>
                     <label class="block text-sm font-semibold text-gray-600 mb-2">事項內容</label>
-                    <input type="text" id="task" placeholder="例如：吃飯提醒、繳費提醒" 
-                        class="block w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-all">
+                    <input type="text" id="task" placeholder="例如：美容預約、店內進貨" 
+                        class="block w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none">
                 </div>
 
                 <div>
                     <label class="block text-sm font-semibold text-gray-600 mb-2">日期與時間</label>
                     <input type="datetime-local" id="datetime" 
-                        class="block w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-all text-gray-700">
+                        class="block w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none text-gray-700">
                 </div>
 
                 <button onclick="submitForm()" id="submitBtn"
@@ -48,7 +46,6 @@
             </div>
         </div>
 
-        <!-- 行事曆列表頁面 -->
         <div id="pageList" class="hidden space-y-4">
             <div id="calendarList" class="space-y-3">
                 <div class="text-center py-10">
@@ -62,10 +59,8 @@
     </div>
 
     <script>
-        // 請務必將下方的 ID 替換為您的實際 LIFF ID
         const MY_LIFF_ID = '2009768155-juHmylqj'; 
-        // 請將下方的 URL 替換為您的 GAS 部署網址 (用於讀取資料)
-        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzm8yPJm05NM9HCXrwr-c9kp1fA_-OQcoGQSA58HJxMABuxqvp_T1B01gCiIrUe88pw/exec';
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzm8yPJm05NM9HCXrwr-c9kp1fA_-OQcoGQSA58HJxMABuxqvp_T1B01gCilrUe88pw/exec';
 
         async function initLiff() {
             try {
@@ -106,9 +101,12 @@
             const listDiv = document.getElementById('calendarList');
             try {
                 const profile = await liff.getProfile();
+                const context = liff.getContext();
                 const userId = profile.userId;
+                const groupId = context ? context.groupId : ''; // 取得目前群組 ID
                 
-                const response = await fetch(`${GAS_WEB_APP_URL}?userId=${userId}`);
+                // 發送請求時同時帶入個人 ID 與群組 ID
+                const response = await fetch(`${GAS_WEB_APP_URL}?userId=${userId}&groupId=${groupId || ''}`);
                 const data = await response.json();
 
                 if (data.length === 0) {
