@@ -7,46 +7,69 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        body { background-color: #f8fafc; }
-        .form-card { background: white; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        body { background-color: #f1f5f9; }
+        .form-card { background: white; border-radius: 1.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .tab-active { border-bottom: 3px solid #16a34a; color: #16a34a; font-weight: bold; }
     </style>
 </head>
-<body class="p-4 flex items-center justify-center min-h-screen">
+<body class="p-4 flex flex-col items-center min-h-screen">
 
-    <div class="form-card w-full max-w-md p-8">
-        <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-slate-800">提醒事項小幫手</h1>
+    <div class="w-full max-w-md">
+        <!-- 頁籤導覽 -->
+        <div class="flex justify-around mb-6 bg-white rounded-xl p-2 shadow-sm">
+            <button onclick="switchTab('add')" id="tabAdd" class="flex-1 py-2 text-center tab-active transition-all">新增提醒</button>
+            <button onclick="switchTab('list')" id="tabList" class="flex-1 py-2 text-center text-gray-400 transition-all">查看行事曆</button>
         </div>
-        
-        <div class="space-y-6">
-            <div>
-                <label class="block text-sm font-bold text-slate-600 mb-2">提醒事項</label>
-                <input type="text" id="task" placeholder="輸入要提醒的事項..." 
-                    class="block w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-all">
-            </div>
 
-            <div>
-                <label class="block text-sm font-bold text-slate-600 mb-2">日期與時間</label>
-                <input type="datetime-local" id="datetime" 
-                    class="block w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none text-slate-700">
+        <!-- 新增提醒頁面 -->
+        <div id="pageAdd" class="form-card p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold text-gray-800">新增提醒事項</h1>
+                <p class="text-sm text-gray-400 mt-1">湖口中山店 / 竹北成功店</p>
             </div>
+            
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2">事項內容</label>
+                    <input type="text" id="task" placeholder="例如：美容預約、店內進貨" 
+                        class="block w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-all">
+                </div>
 
-            <button onclick="submitForm()" id="submitBtn"
-                class="w-full bg-green-600 text-white font-bold py-4 rounded-xl hover:bg-green-700 active:scale-95 transition-all shadow-lg shadow-green-200">
-                儲存提醒
-            </button>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-600 mb-2">日期與時間</label>
+                    <input type="datetime-local" id="datetime" 
+                        class="block w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition-all text-gray-700">
+                </div>
+
+                <button onclick="submitForm()" id="submitBtn"
+                    class="w-full bg-green-600 text-white font-bold py-4 rounded-xl hover:bg-green-700 active:scale-95 transition-all shadow-lg shadow-green-100">
+                    儲存並設定提醒
+                </button>
+            </div>
+        </div>
+
+        <!-- 行事曆列表頁面 -->
+        <div id="pageList" class="hidden space-y-4">
+            <div id="calendarList" class="space-y-3">
+                <div class="text-center py-10">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                    <p class="mt-4 text-gray-500">正在加載行事曆...</p>
+                </div>
+            </div>
         </div>
 
         <div id="statusMsg" class="mt-6 text-center text-sm font-medium hidden"></div>
     </div>
 
     <script>
-        // 請確保這是您在 LINE Developer 看到的正確 LIFF ID
-        const LIFF_ID = '2009768155-juHmylqj'; 
+        // 請務必將下方的 ID 替換為您的實際 LIFF ID
+        const MY_LIFF_ID = '2009768155-juHmylqj'; 
+        // 請將下方的 URL 替換為您的 GAS 部署網址 (用於讀取資料)
+        const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzm8yPJm05NM9HCXrwr-c9kp1fA_-OQcoGQSA58HJxMABuxqvp_T1B01gCilrUe88pw/exec';
 
         async function initLiff() {
             try {
-                await liff.init({ liffId: LIFF_ID });
+                await liff.init({ liffId: MY_LIFF_ID });
                 if (!liff.isLoggedIn()) {
                     liff.login();
                 }
@@ -55,50 +78,97 @@
             }
         }
 
+        function switchTab(tab) {
+            const pageAdd = document.getElementById('pageAdd');
+            const pageList = document.getElementById('pageList');
+            const tabAdd = document.getElementById('tabAdd');
+            const tabList = document.getElementById('tabList');
+
+            if (tab === 'add') {
+                pageAdd.classList.remove('hidden');
+                pageList.classList.add('hidden');
+                tabAdd.classList.add('tab-active');
+                tabAdd.classList.remove('text-gray-400');
+                tabList.classList.remove('tab-active');
+                tabList.classList.add('text-gray-400');
+            } else {
+                pageAdd.classList.add('hidden');
+                pageList.classList.remove('hidden');
+                tabList.classList.add('tab-active');
+                tabList.classList.remove('text-gray-400');
+                tabAdd.classList.remove('tab-active');
+                tabAdd.classList.add('text-gray-400');
+                loadCalendar();
+            }
+        }
+
+        async function loadCalendar() {
+            const listDiv = document.getElementById('calendarList');
+            try {
+                const profile = await liff.getProfile();
+                const userId = profile.userId;
+                
+                const response = await fetch(`${GAS_WEB_APP_URL}?userId=${userId}`);
+                const data = await response.json();
+
+                if (data.length === 0) {
+                    listDiv.innerHTML = '<div class="bg-white p-8 rounded-2xl text-center text-gray-400">目前尚無排定事項</div>';
+                    return;
+                }
+
+                listDiv.innerHTML = data.map(item => `
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 ${new Date(item.time) < new Date() ? 'border-gray-300' : 'border-green-500'}">
+                        <div class="flex justify-between items-start">
+                            <h3 class="font-bold text-gray-800">${item.task}</h3>
+                            <div class="flex space-x-1">
+                                <span class="text-[10px] px-2 py-0.5 rounded-full ${item.notified1d ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}">1天前</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full ${item.notified1h ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}">1小時前</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-2 flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            ${new Date(item.time).toLocaleString('zh-TW', { hour12: false })}
+                        </p>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                listDiv.innerHTML = `<div class="bg-red-50 p-6 rounded-2xl text-red-500 text-sm">無法載入資料：${err.message}</div>`;
+            }
+        }
+
         async function submitForm() {
-            const task = document.getElementById('task').value.trim();
+            const task = document.getElementById('task').value;
             const datetime = document.getElementById('datetime').value;
             const btn = document.getElementById('submitBtn');
 
             if (!task || !datetime) {
-                alert('請完整填寫事項內容與時間');
+                alert('請完整填寫資訊');
                 return;
             }
 
             btn.disabled = true;
-            btn.innerText = '處理中...';
+            btn.innerText = '儲存中...';
+
+            const formattedDate = datetime.replace('T', ' ');
 
             try {
-                if (!liff.isInClient()) {
-                    throw new Error('請從 LINE 聊天視窗內開啟小幫手');
-                }
-
-                // 格式化日期：將 T 換成空格
-                const formattedDate = datetime.replace('T', ' ');
-
-                // 直接發送訊息到聊天室
                 await liff.sendMessages([{
                     type: 'text',
                     text: `[紀錄] ${task} ${formattedDate}`
                 }]);
-
-                showStatus('✅ 儲存成功！視窗即將關閉', 'text-green-600');
-                
-                // 成功後延遲關閉視窗
-                setTimeout(() => {
-                    liff.closeWindow();
-                }, 1200);
-
+                showStatus('✅ 儲存成功！', 'text-green-600');
+                setTimeout(() => liff.closeWindow(), 1200);
             } catch (err) {
-                alert('儲存失敗：' + err.message);
+                alert('傳送失敗：' + err.message);
                 btn.disabled = false;
-                btn.innerText = '儲存提醒';
+                btn.innerText = '儲存並設定提醒';
             }
         }
 
         function showStatus(msg, colorClass) {
             const status = document.getElementById('statusMsg');
-            status.innerHTML = msg;
+            status.innerText = msg;
             status.className = `mt-6 text-center text-sm font-medium ${colorClass}`;
             status.classList.remove('hidden');
         }
