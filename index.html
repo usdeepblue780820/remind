@@ -10,16 +10,19 @@
         body { background-color: #f1f5f9; }
         .form-card { background: white; border-radius: 1.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
         .tab-active { border-bottom: 3px solid #16a34a; color: #16a34a; font-weight: bold; }
+        .sub-tab-active { background-color: #16a34a; color: white; }
     </style>
 </head>
 <body class="p-4 flex flex-col items-center min-h-screen">
 
     <div class="w-full max-w-md">
+        <!-- 主分頁控制 -->
         <div class="flex justify-around mb-6 bg-white rounded-xl p-2 shadow-sm">
             <button onclick="switchTab('add')" id="tabAdd" class="flex-1 py-2 text-center tab-active transition-all">新增提醒</button>
             <button onclick="switchTab('list')" id="tabList" class="flex-1 py-2 text-center text-gray-400 transition-all">查看行事曆</button>
         </div>
 
+        <!-- 新增頁面 -->
         <div id="pageAdd" class="form-card p-8">
             <div class="text-center mb-8">
                 <h1 class="text-2xl font-bold text-gray-800">新增提醒事項</h1>
@@ -46,7 +49,14 @@
             </div>
         </div>
 
+        <!-- 列表頁面 -->
         <div id="pageList" class="hidden space-y-4">
+            <!-- 書籤分類切換 -->
+            <div class="flex bg-gray-200 rounded-xl p-1 mb-4">
+                <button onclick="setFilter('personal')" id="subTabPersonal" class="flex-1 py-1.5 text-sm rounded-lg transition-all sub-tab-active">個人</button>
+                <button onclick="setFilter('group')" id="subTabGroup" class="flex-1 py-1.5 text-sm rounded-lg transition-all text-gray-500">群組</button>
+            </div>
+
             <div id="calendarList" class="space-y-3">
                 <div class="text-center py-10">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
@@ -61,6 +71,9 @@
     <script>
         const MY_LIFF_ID = '2009768155-juHmylqj'; 
         const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzm8yPJm05NM9HCXrwr-c9kp1fA_-OQcoGQSA58HJxMABuxqvp_T1B01gCiIrUe88pw/exec';
+        
+        let allData = []; // 儲存所有抓回來的資料
+        let currentFilter = 'personal';
 
         async function initLiff() {
             try {
@@ -93,47 +106,70 @@
                 tabList.classList.remove('text-gray-400');
                 tabAdd.classList.remove('tab-active');
                 tabAdd.classList.add('text-gray-400');
-                loadCalendar();
+                fetchData();
             }
         }
 
-        async function loadCalendar() {
+        function setFilter(type) {
+            currentFilter = type;
+            const personalBtn = document.getElementById('subTabPersonal');
+            const groupBtn = document.getElementById('subTabGroup');
+            
+            if (type === 'personal') {
+                personalBtn.className = 'flex-1 py-1.5 text-sm rounded-lg transition-all sub-tab-active';
+                groupBtn.className = 'flex-1 py-1.5 text-sm rounded-lg transition-all text-gray-500';
+            } else {
+                groupBtn.className = 'flex-1 py-1.5 text-sm rounded-lg transition-all sub-tab-active';
+                personalBtn.className = 'flex-1 py-1.5 text-sm rounded-lg transition-all text-gray-500';
+            }
+            renderCalendar();
+        }
+
+        async function fetchData() {
             const listDiv = document.getElementById('calendarList');
             try {
                 const profile = await liff.getProfile();
                 const userId = profile.userId;
-
-                // 從 URL 參數取得 groupId（由 Bot 傳送的正確格式）
                 const urlParams = new URLSearchParams(window.location.search);
                 const groupId = urlParams.get('groupId') || '';
 
                 const response = await fetch(`${GAS_WEB_APP_URL}?userId=${userId}&groupId=${groupId}`);
-                const data = await response.json();
-
-                if (data.length === 0) {
-                    listDiv.innerHTML = '<div class="bg-white p-8 rounded-2xl text-center text-gray-400">目前尚無排定事項</div>';
-                    return;
-                }
-
-                listDiv.innerHTML = data.map(item => `
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 ${new Date(item.time) < new Date() ? 'border-gray-300' : 'border-green-500'}">
-                        <div class="flex justify-between items-start">
-                            <h3 class="font-bold text-gray-800">${item.task}</h3>
-                            <div class="flex space-x-1">
-                                <span class="text-[10px] px-2 py-0.5 rounded-full ${item.notified1d ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}">1天前</span>
-                                <span class="text-[10px] px-2 py-0.5 rounded-full ${item.notified1h ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}">1小時前</span>
-                            </div>
-                        </div>
-                        <p class="text-sm text-gray-500 mt-2 flex items-center">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            ${new Date(item.time).toLocaleString('zh-TW', { hour12: false })}
-                        </p>
-                    </div>
-                `).join('');
-
+                allData = await response.json();
+                renderCalendar();
             } catch (err) {
                 listDiv.innerHTML = `<div class="bg-red-50 p-6 rounded-2xl text-red-500 text-sm">無法載入資料：${err.message}</div>`;
             }
+        }
+
+        function renderCalendar() {
+            const listDiv = document.getElementById('calendarList');
+            
+            // 根據書籤篩選資料：groupId 為空字串或 null 視為個人
+            const filtered = allData.filter(item => {
+                const isGroupItem = item.groupId && item.groupId.trim() !== "";
+                return currentFilter === 'group' ? isGroupItem : !isGroupItem;
+            });
+
+            if (filtered.length === 0) {
+                listDiv.innerHTML = `<div class="bg-white p-8 rounded-2xl text-center text-gray-400">目前尚無${currentFilter === 'group' ? '群組' : '個人'}事項</div>`;
+                return;
+            }
+
+            listDiv.innerHTML = filtered.map(item => `
+                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 ${new Date(item.time) < new Date() ? 'border-gray-300' : 'border-green-500'}">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-bold text-gray-800">${item.task}</h3>
+                        <div class="flex space-x-1">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full ${item.notified1d ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}">1天前</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full ${item.notified1h ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}">1小時前</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        ${new Date(item.time).toLocaleString('zh-TW', { hour12: false })}
+                    </p>
+                </div>
+            `).join('');
         }
 
         async function submitForm() {
@@ -148,7 +184,6 @@
 
             btn.disabled = true;
             btn.innerText = '儲存中...';
-
             const formattedDate = datetime.replace('T', ' ');
 
             try {
