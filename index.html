@@ -104,7 +104,7 @@
                 const context = liff.getContext();
                 const userId = profile.userId;
                 const groupId = context ? context.groupId : ''; // 取得目前群組 ID
-                
+                alert('groupId = ' + (groupId || '空的'));
                 // 發送請求時同時帶入個人 ID 與群組 ID
                 const response = await fetch(`${GAS_WEB_APP_URL}?userId=${userId}&groupId=${groupId || ''}`);
                 const data = await response.json();
